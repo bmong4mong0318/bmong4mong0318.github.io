@@ -16,7 +16,7 @@ free는 언제 해주어야 할까?
 
 # 메모리 누수의 발생
 
-42서울 과제를 하던 중 메모리 누수가 발생하였습니다. 인자를 받아서 인자의 유효성을 검증하는 부분이였다.
+42서울 과제를 하던 중 메모리 누수가 발생하였습니다. 인자를 받아서 인자의 유효성을 검증하는 부분이였습니다.
 
 <br>
 
@@ -53,9 +53,7 @@ void	ft_validate_param(char *argv, t_stack *stack)
 
 <br>
 
-우선 `ft_validate_param()` 을 호출하는 부분이 문제가 되는 것을 발견했습니다. 
-`generate_stack()` 함수에서 while문을 통해서 `ft_validate_param()`를 반복적으로 호출하게 됩니다. 
-그런데 이때마다 split_argv 변수는 내부에서 새롭게 할당된 split을 받게 됩니다. 그때마다 이전에 가리키고 있었던 메모리를 잃어버리게 되는 것입니다. 
+우선 `ft_validate_param()` 을 호출하는 부분이 문제가 되는 것을 발견했습니다. `generate_stack()` 함수에서 while문을 통해서 `ft_validate_param()`를 반복적으로 호출하게 됩니다. 이때마다 split_argv 변수는 ft_split 내부의 malloc 함수를 통해서 힙 영역의 메모리를 할당받게 됩니다. 새롭게 메모리를 할당 받을때마다 이전에 가리키고 있었던 메모리를 잃어버리게 되는 것입니다. 따라서 `ft_validate_param()`이 종료되기전에 명시적으로 메모리 해제를 해주어야 합니다.
 
 ```c
 void	generate_stack(char **argv, t_stack *stack)
@@ -74,7 +72,41 @@ void	generate_stack(char **argv, t_stack *stack)
 ```
 
 <br>
-## 수정된 코드
+
+## 1차 수정
+```c
+void	ft_validate_param(char *argv, t_stack *stack)
+{
+	char	**split_argv;
+	int		i;
+
+	i = 0;
+	split_argv = ft_split(argv, ' ');
+	if (!split_argv || !*split_argv)
+		ft_error();
+	while (*split_argv)
+	{
+		if (!is_nbr(*split_argv))
+			ft_error();
+		if (!is_integer(ft_atoi(*split_argv)))
+			ft_error();
+		if (!is_duplicate(ft_atoi(*split_argv), stack))
+			ft_error();
+		ft_push_bottom(stack, ft_init_new_node(ft_atoi(*split_argv)));
+		split_argv++;
+	}
+	while (split_argv[i])
+		i++;
+	ft_free(split_argv, i);
+}
+```
+
+그런데 이경우 또 다른 에러가 발생합니다. 첫번째 while문 안에서 split_argv의 인자이동을 위해 포인터연산을 통해서 주소를 한칸씩 옮겨주고 있습니다. while문이 끝났을때, split_argv 포인터는 split된 문자들이 아닌 정체 모를(fr_split함수를 통해 힙의 메모리를 할당받지 않은) 값의 주소를 가리키고 있을 것입니다. 이 주소를 곧바로 free 하려고 하다보니 malloc 되지 않은 메모리를 해제하려 한다는 오류가 뜨고 맙니다. 
+
+
+<br>
+
+## 2차 수정
 ```c
 void	ft_validate_param(char *argv, t_stack *stack)
 {
@@ -98,3 +130,4 @@ void	ft_validate_param(char *argv, t_stack *stack)
 	ft_free(split_argv, i);
 }
 ```
+최종적으로 while을 포인터로 순회하는 것이 아닌 인덱스로 순회하도록하여 포인터로 인해 생기는 문제점을 제거하였습니다.
